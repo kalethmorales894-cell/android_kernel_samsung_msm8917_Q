@@ -1,3 +1,4 @@
+```yaml
 name: Build Medusa Kernel
 
 on:
@@ -25,18 +26,25 @@ jobs:
             flex \
             libssl-dev \
             libelf-dev \
-            zip
+            zip \
+            wget \
+            zlib1g-dev \
+            libffi-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev
 
-      - name: Set up Python 2.7
-        uses: actions/setup-python@v5
-        with:
-          python-version: '2.7'
-
-      - name: Configure Python 2 command
+      - name: Install Python 2.7.18
         shell: bash
         run: |
-          python --version
-          sudo ln -sf "$(command -v python)" /usr/local/bin/python2
+          cd /tmp
+          wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+          tar -xzf Python-2.7.18.tgz
+          cd Python-2.7.18
+          ./configure --prefix=/usr/local
+          make -j2
+          sudo make altinstall
+          sudo ln -sf /usr/local/bin/python2.7 /usr/local/bin/python2
           python2 --version
 
       - name: Check kernel toolchain
@@ -44,6 +52,7 @@ jobs:
           test -f arch/arm/configs/j6primelte_defconfig
           test -x gcc/bin/arm-linux-androideabi-gcc
           test -f build_medusa.sh
+          python2 --version
 
       - name: Compile kernel
         shell: bash
