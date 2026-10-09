@@ -1,0 +1,68 @@
+name: Build Medusa Kernel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile Samsung Galaxy J6+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Download kernel source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            zip \
+            wget \
+            zlib1g-dev \
+            libffi-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev
+
+      - name: Install Python 2.7.18
+        shell: bash
+        run: |
+          cd /tmp
+          wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+          tar -xzf Python-2.7.18.tgz
+          cd Python-2.7.18
+          ./configure --prefix=/usr/local
+          make -j2
+          sudo make altinstall
+          sudo ln -sf /usr/local/bin/python2.7 /usr/local/bin/python2
+          python2 --version
+
+      - name: Check kernel toolchain
+        run: |
+          test -f arch/arm/configs/j6primelte_defconfig
+          test -x gcc/bin/arm-linux-androideabi-gcc
+          test -f build_medusa.sh
+          python2 --version
+
+      - name: Compile kernel
+        shell: bash
+        run: |
+          chmod +x build_medusa.sh
+          ./build_medusa.sh
+
+      - name: Upload kernel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Medusa-J6Plus-Kernel
+          path: out/arch/arm/boot/zImage
+          if-no-files-found: error
+          retention-days: 7
