@@ -1,86 +1,132 @@
+```bash
+#!/usr/bin/env bash
+
 ##############################################
-#   SebaUbuntu custom kernel build script    #
+#       Project Medusa Kernel Builder        #
+#          Samsung Galaxy J6+                #
 ##############################################
 
-# Set defaults directory's
-ROOT_DIR=$(pwd)
-OUT_DIR=$ROOT_DIR/out
-ANYKERNEL_DIR=$ROOT_DIR/anykernel3
-KERNEL_DIR=$ROOT_DIR
-DATE=$(date +"%m-%d-%y")
-BUILD_START=$(date +"%s")
+set -o pipefail
 
-# Export ARCH and SUBARCH <arm, arm64, x86, x86_64>
+# Directorios
+ROOT_DIR="$(pwd)"
+OUT_DIR="$ROOT_DIR/out"
+BUILD_START="$(date +%s)"
+
+# Arquitectura
 export ARCH=arm
 export SUBARCH=arm
 
-# Set kernel name and defconfig
-# export VERSION=
-DEF=j6primelte_defconfig
-export DEFCONFIG=$DEF
+# Configuración del dispositivo
+DEF="j6primelte_defconfig"
+export DEFCONFIG="$DEF"
+export LOCALVERSION="-Medusa"
 
-# Keep it as is
-export LOCALVERSION=-Medusa
+# Identificación de compilación
+export KBUILD_BUILD_USER="Batu33TR"
+export KBUILD_BUILD_HOST="ProjectMedusa"
 
-# Export Username and machine name
-export KBUILD_BUILD_USER=Batu33TR
-export KBUILD_BUILD_HOST=ProjectMedusa
+# Compilador
+export CROSS_COMPILE="$ROOT_DIR/gcc/bin/arm-linux-androideabi-"
 
-# Color definition
-red=`tput setaf 1`
-green=`tput setaf 2`
-yellow=`tput setaf 3`
-blue=`tput setaf 4`
-magenta=`tput setaf 5`
-cyan=`tput setaf 6`
-white=`tput setaf 7`
-reset=`tput sgr0`
+# Mostrar errores sin depender de tput
+echo "=============================================="
+echo "       Project Medusa Kernel Builder"
+echo "=============================================="
+echo "Dispositivo: Samsung Galaxy J6+"
+echo "Defconfig: $DEF"
+echo "Arquitectura: $ARCH"
+echo "Directorio de salida: $OUT_DIR"
+echo "Toolchain: GCC 4.9"
+echo "Inicio: $(date)"
+echo "=============================================="
 
-# Cross-compiler exporting
-	# Export ARM from the given directory
-	export CROSS_COMPILE=$(pwd)/gcc/bin/arm-linux-androideabi-
-
-echo -e "*****************************************************"
-echo    "            Compiling kernel using GCC               "
-echo -e "*****************************************************"
-echo -e "-----------------------------------------------------"
-echo    " Architecture: $ARCH                                 "
-echo    " Output directory: $OUT_DIR                          "
-echo    " Kernel version: $VERSION                            "
-echo	" Defconfig: $DEF				      "
-echo    " Build user: $KBUILD_BUILD_USER                      "
-echo    " Build machine: $KBUILD_BUILD_HOST                   "
-echo    " Build started on: $BUILD_START                      "
-echo    " Toolchain: GCC 4.9 Brillo-M10-Release               "
-echo -e "-----------------------------------------------------"
-
-# Set kernel source workspace
-cd $KERNEL_DIR
-
-rm -rf out
-
-# Make your device device_defconfig
-make O=$OUT_DIR ARCH=$ARCH KCFLAGS=-mno-android $DEFCONFIG
-DEFCONFIG_SUCCESS=$?
-if [ $DEFCONFIG_SUCCESS != 0 ]
-	then
-		echo "$red Error: make $DEFCONFIG failed, specified a defconfig not present? $reset"
-		exit
+# Comprobar archivos necesarios
+if [ ! -f "$ROOT_DIR/Makefile" ]; then
+    echo "ERROR: No se encuentra el Makefile del kernel."
+    exit 1
 fi
 
-# Build Kernel
-make O=$OUT_DIR ARCH=$ARCH KCFLAGS=-mno-android -j$(nproc --all)
-
-# Find how much build has been long
-BUILD_END=$(date +"%s")
-DIFF=$(($BUILD_END - $BUILD_START))
-
-BUILD_SUCCESS=$?
-if [ $BUILD_SUCCESS != 0 ]
-	then
-		echo "$red Error: Build failed in $(($DIFF / 60)) minute(s) and $(($DIFF % 60)) seconds $reset"
-		exit
+if [ ! -f "$ROOT_DIR/arch/arm/configs/$DEF" ]; then
+    echo "ERROR: No existe arch/arm/configs/$DEF"
+    exit 1
 fi
 
+if [ ! -x "${CROSS_COMPILE}gcc" ]; then
+    echo "ERROR: No se encuentra el compilador:"
+    echo "${CROSS_COMPILE}gcc"
+    exit 1
+fi
 
-echo -e "$green Build completed in $(($DIFF / 60)) minute(s) and $(($DIFF % 60)) seconds $reset"
+# Comprobar herramientas Python
+echo "===== Comprobando Python ====="
+if command -v python2 >/dev/null 2>&1; then
+    echo "Python 2 disponible: $(command -v python2)"
+elif command -v python2.7 >/dev/null 2>&1; then
+    echo "Python 2.7 disponible: $(command -v python2.7)"
+else
+    echo "AVISO: Python 2 no está instalado."
+    echo "Si algún script requiere Python 2, la compilación puede fallar."
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+    python3 --version
+fi
+
+# Comprobar compilador
+echo "===== Versión del compilador ====="
+"${CROSS_COMPILE}gcc" --version || exit 1
+
+# Preparar salida
+rm -rf "$OUT_DIR"
+mkdir -p "$OUT_DIR" || exit 1
+
+# Generar configuración
+echo "===== Generando defconfig ====="
+make O="$OUT_DIR" ARCH="$ARCH" \
+    CROSS_COMPILE="$CROSS_COMPILE" \
+    KCFLAGS=-mno-android "$DEF"
+
+DEFCONFIG_STATUS=$?
+
+if [ "$DEFCONFIG_STATUS" -ne 0 ]; then
+    echo "ERROR: Falló la generación de la configuración."
+    exit "$DEFCONFIG_STATUS"
+fi
+
+# Compilar kernel
+echo "===== Iniciando compilación ====="
+make O="$OUT_DIR" ARCH="$ARCH" \
+    CROSS_COMPILE="$CROSS_COMPILE" \
+    KCFLAGS=-mno-android \
+    -j"$(nproc --all)"
+
+BUILD_STATUS=$?
+
+# Calcular duración después de guardar el resultado
+BUILD_END="$(date +%s)"
+DIFF=$((BUILD_END - BUILD_START))
+
+if [ "$BUILD_STATUS" -ne 0 ]; then
+    echo "ERROR: La compilación falló."
+    echo "Código de salida: $BUILD_STATUS"
+    echo "Duración: $((DIFF / 60)) min $((DIFF % 60)) s"
+    exit "$BUILD_STATUS"
+fi
+
+echo "===== Compilación finalizada ====="
+echo "Duración: $((DIFF / 60)) min $((DIFF % 60)) s"
+
+# Verificar kernel generado
+if [ -f "$OUT_DIR/arch/arm/boot/zImage" ]; then
+    echo "Kernel generado correctamente:"
+    ls -lh "$OUT_DIR/arch/arm/boot/zImage"
+else
+    echo "ERROR: La compilación terminó, pero no se encontró zImage."
+    exit 1
+fi
+
+echo "=============================================="
+echo "COMPILACIÓN COMPLETADA"
+echo "=============================================="
+```
