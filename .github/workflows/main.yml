@@ -1,5 +1,5 @@
-
-name: Diagnose Medusa Kernel
+```yaml
+name: Build Medusa Kernel
 
 on:
   workflow_dispatch:
@@ -8,46 +8,55 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
+  build:
+    name: Compile Samsung Galaxy J6+
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Download source
+      - name: Download kernel source
         uses: actions/checkout@v4
 
-      - name: Diagnose configuration and tools
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            zip
+
+      - name: Set up Python 2.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: '2.7'
+
+      - name: Configure Python 2 command
         shell: bash
         run: |
-          set +e
-          echo "===== BRANCH AND COMMIT ====="
-          git branch --show-current
-          git rev-parse HEAD
+          python --version
+          sudo ln -sf "$(command -v python)" /usr/local/bin/python2
+          python2 --version
 
-          echo "===== J6+ DEFCONFIG FILE ====="
+      - name: Check kernel toolchain
+        run: |
           test -f arch/arm/configs/j6primelte_defconfig
-          echo "file test exit code: $?"
+          test -x gcc/bin/arm-linux-androideabi-gcc
+          test -f build_medusa.sh
 
-          echo "===== LOCALVERSION IN DEFCONFIG ====="
-          grep -n 'CONFIG_LOCALVERSION' arch/arm/configs/j6primelte_defconfig
-          echo "grep exit code: $?"
+      - name: Compile kernel
+        shell: bash
+        run: |
+          chmod +x build_medusa.sh
+          ./build_medusa.sh
 
-          echo "===== VERSION SETTINGS IN SOURCE ====="
-          grep -nE 'CONFIG_LOCALVERSION|LOCALVERSION|KERNELVERSION' Makefile build_medusa.sh
-          grep -n 'CONFIG_LOCALVERSION' arch/arm/configs/j6primelte_defconfig
-
-          echo "===== BUILD SCRIPT SETTINGS ====="
-          grep -nE '^(DEF=|export DEFCONFIG|export LOCALVERSION|BUILD_SUCCESS=|BUILD_END=)' build_medusa.sh
-
-          echo "===== PYTHON AVAILABILITY ====="
-          command -v python2
-          command -v python2.7
-          python3 --version
-
-          echo "===== GCC VERSION ====="
-          gcc/bin/arm-linux-androideabi-gcc --version
-
-          echo "===== GCC STACK PROTECTOR SUPPORT ====="
-          echo 'int main(void) { return 0; }' > /tmp/check.c
-          gcc/bin/arm-linux-androideabi-gcc -fstack-protector-strong -c /tmp/check.c -o /tmp/check.o
-          echo "stack protector test exit code: $?"
-
-          echo "===== END DIAGNOSTIC ====="
+      - name: Upload kernel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Medusa-J6Plus-Kernel
+          path: out/arch/arm/boot/zImage
+          if-no-files-found: error
+          retention-days: 7
+```
