@@ -20,7 +20,7 @@ DEF=j6primelte_defconfig
 export DEFCONFIG=$DEF
 
 # Keep it as is
-export LOCALVERSION=$VERSION
+export LOCALVERSION=-Medusa
 
 # Export Username and machine name
 export KBUILD_BUILD_USER=Batu33TR
