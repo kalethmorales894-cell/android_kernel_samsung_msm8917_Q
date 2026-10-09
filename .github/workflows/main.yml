@@ -58,4 +58,3 @@ jobs:
           path: out/arch/arm/boot/zImage
           if-no-files-found: error
           retention-days: 7
-```
