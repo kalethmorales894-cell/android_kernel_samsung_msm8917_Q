@@ -1,0 +1,39 @@
+name: Build Medusa Kernel for Galaxy J6+
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download kernel source
+        uses: actions/checkout@v4
+
+      - name: Configure J6+
+        run: |
+          test -f arch/arm/configs/j6primelte_defconfig
+          test -x gcc/bin/arm-linux-androideabi-gcc
+          sed -i 's/^DEF=j4primelte_defconfig$/DEF=j6primelte_defconfig/' build_medusa.sh
+          sed -i '/^BUILD_END=/i BUILD_SUCCESS=$?' build_medusa.sh
+          sed -i '/^BUILD_SUCCESS=\$/d' build_medusa.sh
+          sed -i 's/exit$/exit 1/' build_medusa.sh
+
+      - name: Build kernel
+        run: |
+          export VERSION=-j6primelte
+          bash build_medusa.sh 2>&1 | tee build.log
+          test -s out/arch/arm/boot/zImage
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: medusa-j6plus-build-logs
+          path: |
+            build.log
+            out/.config
+          if-no-files-found: warn
