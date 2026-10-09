@@ -1,4 +1,5 @@
-name: Build Medusa Kernel for Galaxy J6+
+
+name: Diagnose Medusa Kernel
 
 on:
   workflow_dispatch:
@@ -7,43 +8,46 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  diagnose:
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Download kernel source
+      - name: Download source
         uses: actions/checkout@v4
 
-      - name: Install required tools
+      - name: Diagnose configuration and tools
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python2.7
-          sudo ln -sf /usr/bin/python2.7 /usr/local/bin/python2
-          python2 --version
-          export TERM=xterm
+          set +e
+          echo "===== BRANCH AND COMMIT ====="
+          git branch --show-current
+          git rev-parse HEAD
 
-      - name: Configure J6+
-        run: |
+          echo "===== J6+ DEFCONFIG FILE ====="
           test -f arch/arm/configs/j6primelte_defconfig
-          test -x gcc/bin/arm-linux-androideabi-gcc
-          sed -i 's|^CONFIG_LOCALVERSION=.*|CONFIG_LOCALVERSION="-Medusa"|' arch/arm/configs/j6primelte_defconfig
-          sed -i 's/^DEF=j4primelte_defconfig$/DEF=j6primelte_defconfig/' build_medusa.sh
-          grep '^CONFIG_LOCALVERSION=' arch/arm/configs/j6primelte_defconfig
-          grep '^DEF=' build_medusa.sh
+          echo "file test exit code: $?"
 
-      - name: Build kernel
-        run: |
-          export TERM=xterm
-          export VERSION=-j6primelte
-          bash build_medusa.sh 2>&1 | tee build.log
-          test -s out/arch/arm/boot/zImage
+          echo "===== LOCALVERSION IN DEFCONFIG ====="
+          grep -n 'CONFIG_LOCALVERSION' arch/arm/configs/j6primelte_defconfig
+          echo "grep exit code: $?"
 
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: medusa-j6plus-build-logs
-          path: |
-            build.log
-            out/.config
-          if-no-files-found: warn
+          echo "===== VERSION SETTINGS IN SOURCE ====="
+          grep -nE 'CONFIG_LOCALVERSION|LOCALVERSION|KERNELVERSION' Makefile build_medusa.sh
+          grep -n 'CONFIG_LOCALVERSION' arch/arm/configs/j6primelte_defconfig
+
+          echo "===== BUILD SCRIPT SETTINGS ====="
+          grep -nE '^(DEF=|export DEFCONFIG|export LOCALVERSION|BUILD_SUCCESS=|BUILD_END=)' build_medusa.sh
+
+          echo "===== PYTHON AVAILABILITY ====="
+          command -v python2
+          command -v python2.7
+          python3 --version
+
+          echo "===== GCC VERSION ====="
+          gcc/bin/arm-linux-androideabi-gcc --version
+
+          echo "===== GCC STACK PROTECTOR SUPPORT ====="
+          echo 'int main(void) { return 0; }' > /tmp/check.c
+          gcc/bin/arm-linux-androideabi-gcc -fstack-protector-strong -c /tmp/check.c -o /tmp/check.o
+          echo "stack protector test exit code: $?"
+
+          echo "===== END DIAGNOSTIC ====="
