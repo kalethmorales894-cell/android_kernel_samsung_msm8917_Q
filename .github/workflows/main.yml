@@ -53,16 +53,23 @@ jobs:
           test -f build_medusa.sh
           python2 --version
 
-      - name: Compile kernel
+      - name: Compile kernel and save log
         shell: bash
         run: |
           chmod +x build_medusa.sh
-          ./build_medusa.sh
+          set +e
+          ./build_medusa.sh 2>&1 | tee build_medusa.log
+          BUILD_STATUS=${PIPESTATUS[0]}
+          echo "BUILD_STATUS=$BUILD_STATUS" >> "$GITHUB_ENV"
+          exit "$BUILD_STATUS"
 
-      - name: Upload kernel artifact
+      - name: Upload build log and available kernel
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Medusa-J6Plus-Kernel
-          path: out/arch/arm/boot/zImage-dtb
-          if-no-files-found: error
+          name: Medusa-J6Plus-Diagnostics
+          path: |
+            build_medusa.log
+            out/arch/arm/boot/zImage-dtb
+          if-no-files-found: warn
           retention-days: 7

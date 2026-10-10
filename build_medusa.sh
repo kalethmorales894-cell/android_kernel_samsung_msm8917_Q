@@ -116,21 +116,75 @@ fi
 echo "===== Compilación finalizada ====="
 echo "Duración: $((DIFF / 60)) min $((DIFF % 60)) s"
 
-# Verificar la imagen del kernel con DTB adjuntos
+# Verificación estricta de configuración, imagen y DTB
+set -o pipefail
+CONFIG="$OUT_DIR/.config"
 IMAGE="$OUT_DIR/arch/arm/boot/zImage-dtb"
+ZIMAGE="$OUT_DIR/arch/arm/boot/zImage"
+DTB_DIR="$OUT_DIR/arch/arm/boot/dts"
 
-if [ -f "$IMAGE" ]; then
-    echo "Imagen zImage-dtb generada correctamente:"
-    ls -lh "$IMAGE"
-else
-    echo "ERROR: No se encontró zImage-dtb."
-    exit 1
+echo "===== CONFIGURACIÓN ====="
+for option in \
+    "CONFIG_SEC_J6PRIMELTE_PROJECT=y" \
+    "CONFIG_MACH_J6PRIMELTE_SWA_OPEN=y" \
+    "CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE=y" \
+    "CONFIG_OF=y"
+do
+    grep -Fxq "$option" "$CONFIG" || {
+        echo "ERROR: Falta $option"
+        exit 1
+    }
+    echo "OK: $option"
+done
+
+echo "===== IMÁGENES ====="
+for f in "$ZIMAGE" "$IMAGE"; do
+    [ -s "$f" ] || {
+        echo "ERROR: Archivo ausente o vacío: $f"
+        exit 1
+    }
+    ls -lh "$f"
+done
+
+echo "===== REVISIÓN DE DTB ====="
+for rev in 00 01 02 03 04 05 06; do
+    dtb="$DTB_DIR/msm8917-sec-j6primelte-swa-open-r${rev}.dtb"
+    [ -s "$dtb" ] || {
+        echo "ERROR: Falta el DTB r${rev}: $dtb"
+        exit 1
+    }
+    echo "OK: r${rev}"
+done
+
+echo "===== VALIDAR CONCATENACIÓN ====="
+python3 - "$ZIMAGE" "$IMAGE" "$DTB_DIR" <<'PYVERIFY'
+import sys
+from pathlib import Path
+
+zimage = Path(sys.argv[1]).read_bytes()
+image = Path(sys.argv[2]).read_bytes()
+dtbdir = Path(sys.argv[3])
+
+if not image.startswith(zimage):
+    raise SystemExit("ERROR: zImage-dtb no comienza con el zImage compilado.")
+
+tail = image[len(zimage):]
+for rev in range(7):
+    name = f"msm8917-sec-j6primelte-swa-open-r{rev:02d}.dtb"
+    dtb = (dtbdir / name).read_bytes()
+    if dtb not in tail:
+        raise SystemExit(f"ERROR: {name} no aparece en la sección DTB adjunta.")
+    print(f"OK: {name} adjunto")
+
+print("OK: zImage y las siete revisiones DTB comprobados.")
+PYVERIFY
+
+VERIFY_STATUS=$?
+if [ "$VERIFY_STATUS" -ne 0 ]; then
+    echo "ERROR: Falló la verificación de la imagen."
+    exit "$VERIFY_STATUS"
 fi
 
-echo "===== DTB del Galaxy J6+ generados ====="
-find "$OUT_DIR/arch/arm/boot/dts" -type f \
-    -name '*j6primelte*swa-open*.dtb' -print
-
 echo "=============================================="
-echo "COMPILACIÓN COMPLETADA"
+echo "COMPILACIÓN Y VERIFICACIONES COMPLETADAS"
 echo "=============================================="
