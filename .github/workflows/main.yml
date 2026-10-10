@@ -2,6 +2,15 @@ name: Build Medusa Kernel
 
 on:
   workflow_dispatch:
+    inputs:
+      linker:
+        description: "Enlazador para la prueba de diagnóstico"
+        required: true
+        default: gold
+        type: choice
+        options:
+          - gold
+          - bfd
 
 permissions:
   contents: read
@@ -54,6 +63,8 @@ jobs:
           python2 --version
 
       - name: Compile kernel and save log
+        env:
+          MEDUSA_LD_CHOICE: ${{ inputs.linker || 'gold' }}
         shell: bash
         run: |
           chmod +x build_medusa.sh

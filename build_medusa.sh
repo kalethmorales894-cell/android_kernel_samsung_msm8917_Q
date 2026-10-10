@@ -28,6 +28,24 @@ export KBUILD_BUILD_HOST="ProjectMedusa"
 # Compilador
 export CROSS_COMPILE="$ROOT_DIR/gcc/bin/arm-linux-androideabi-"
 
+# Enlazador seleccionable para pruebas de diagnóstico.
+case "${MEDUSA_LD_CHOICE:-gold}" in
+    gold) MEDUSA_LD="${CROSS_COMPILE}ld" ;;
+    bfd)  MEDUSA_LD="${CROSS_COMPILE}ld.bfd" ;;
+    *)
+        echo "ERROR: MEDUSA_LD_CHOICE debe ser gold o bfd."
+        exit 2
+        ;;
+esac
+
+if [ ! -x "$MEDUSA_LD" ]; then
+    echo "ERROR: No se encuentra el enlazador: $MEDUSA_LD"
+    exit 2
+fi
+
+export MEDUSA_LD
+echo "Enlazador seleccionado: $MEDUSA_LD"
+
 # Mostrar errores sin depender de tput
 echo "=============================================="
 echo "       Project Medusa Kernel Builder"
@@ -84,6 +102,7 @@ mkdir -p "$OUT_DIR" || exit 1
 echo "===== Generando defconfig ====="
 make O="$OUT_DIR" ARCH="$ARCH" \
     CROSS_COMPILE="$CROSS_COMPILE" \
+    LD="$MEDUSA_LD" \
     KCFLAGS=-mno-android "$DEF"
 
 DEFCONFIG_STATUS=$?
@@ -97,6 +116,7 @@ fi
 echo "===== Iniciando compilación ====="
 make O="$OUT_DIR" ARCH="$ARCH" \
     CROSS_COMPILE="$CROSS_COMPILE" \
+    LD="$MEDUSA_LD" \
     KCFLAGS=-mno-android \
     -j"$(nproc --all)" zImage-dtb
 
