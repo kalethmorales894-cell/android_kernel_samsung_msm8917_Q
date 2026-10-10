@@ -63,6 +63,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Medusa-J6Plus-Kernel
-          path: out/arch/arm/boot/zImage
+          path: out/arch/arm/boot/zImage-dtb
           if-no-files-found: error
           retention-days: 7

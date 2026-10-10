@@ -98,7 +98,7 @@ echo "===== Iniciando compilación ====="
 make O="$OUT_DIR" ARCH="$ARCH" \
     CROSS_COMPILE="$CROSS_COMPILE" \
     KCFLAGS=-mno-android \
-    -j"$(nproc --all)"
+    -j"$(nproc --all)" zImage-dtb
 
 BUILD_STATUS=$?
 
@@ -116,14 +116,20 @@ fi
 echo "===== Compilación finalizada ====="
 echo "Duración: $((DIFF / 60)) min $((DIFF % 60)) s"
 
-# Verificar kernel generado
-if [ -f "$OUT_DIR/arch/arm/boot/zImage" ]; then
-    echo "Kernel generado correctamente:"
-    ls -lh "$OUT_DIR/arch/arm/boot/zImage"
+# Verificar la imagen del kernel con DTB adjuntos
+IMAGE="$OUT_DIR/arch/arm/boot/zImage-dtb"
+
+if [ -f "$IMAGE" ]; then
+    echo "Imagen zImage-dtb generada correctamente:"
+    ls -lh "$IMAGE"
 else
-    echo "ERROR: La compilación terminó, pero no se encontró zImage."
+    echo "ERROR: No se encontró zImage-dtb."
     exit 1
 fi
+
+echo "===== DTB del Galaxy J6+ generados ====="
+find "$OUT_DIR/arch/arm/boot/dts" -type f \
+    -name '*j6primelte*swa-open*.dtb' -print
 
 echo "=============================================="
 echo "COMPILACIÓN COMPLETADA"
