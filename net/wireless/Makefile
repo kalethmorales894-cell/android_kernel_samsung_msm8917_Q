@@ -19,10 +19,14 @@ CFLAGS_trace.o := -I$(src)
 
 ccflags-y += -D__CHECK_ENDIAN__
 
-ifeq ($(shell expr $(PRODUCT_SHIPPING_API_LEVEL) \>= 29),1)
+ifneq ($(strip $(PRODUCT_SHIPPING_API_LEVEL)),)
+ifeq ($(shell test -n "$(PRODUCT_SHIPPING_API_LEVEL)" && expr $(PRODUCT_SHIPPING_API_LEVEL) \>= 29),1)
 DB_VERSION = 17
-else ifeq ($(shell expr $(PRODUCT_SHIPPING_API_LEVEL) \>= 28),1)
+else ifeq ($(shell test -n "$(PRODUCT_SHIPPING_API_LEVEL)" && expr $(PRODUCT_SHIPPING_API_LEVEL) \>= 28),1)
 DB_VERSION = 16
+else
+DB_VERSION = 13
+endif
 else
 DB_VERSION = 13
 endif
