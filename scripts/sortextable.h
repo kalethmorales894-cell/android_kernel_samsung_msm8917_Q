@@ -101,7 +101,6 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, table_sort_t custom_sort)
 	const Elf_Sym *symtab;
 	Elf32_Word *symtab_shndx_start = NULL;
 	Elf_Sym *sort_needed_sym;
-	Elf_Shdr *sort_needed_sec;
 	Elf_Rel *relocs = NULL;
 	int relocs_size = 0;
 	const char *secstrtab;
@@ -193,8 +192,5 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, table_sort_t custom_sort)
 			fname);
 		fail_file();
 	}
-	sort_needed_sec = &shdr[get_secindex(r2(&sym->st_shndx),
-					     sort_needed_sym - symtab,
-					     symtab_shndx_start)];
 	/* We need to sort ex_table in runtime due to KASLR */
 }
